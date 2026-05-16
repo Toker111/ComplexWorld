@@ -1,4 +1,5 @@
 import random
+import pandas as pd
 
 
 
@@ -9,6 +10,7 @@ class World(object):
         self.grid= [['.' for _ in range(self.world_size)] for _ in range(self.world_size)]
         self.food_position=[]
         self.organism=[]
+        self.Organism=pd.DataFrame({"id":[],'energy':[],'move_cost':[],'vision_range':[],'age':[],'generation':[]})
 
     def look(self):
         # print(f'=================={self.t}+++++++++++++++++++++++')
@@ -32,9 +34,11 @@ class World(object):
 #prey 猎物
 
 class Organism(object):
+    org_count = 0
+    def __init__(self,world,vision_range=None,move_cost=None,generation=0):
 
-    def __init__(self,world,vision_range=None,move_cost=None):
         n=1
+        self.generation=generation
         self.world = world
         self.is_alive = True
         self.energy = 100
@@ -49,17 +53,31 @@ class Organism(object):
             n+=1
             if world.grid[self.life_y][self.life_x]=='.':
                 world.grid[self.life_y][self.life_x]='0'
+                Organism.org_count += 1
+                self.id=Organism.org_count
+                new_org=pd.DataFrame({"id":[self.org_count],'energy':[f'{self.energy}'],'vision_range':[f'{self.vision_range}'],'move_cost':[f'{self.move_cost}'],'age':[0],'generation':[self.generation]})
+                self.world.Organism=pd.concat([new_org,self.world.Organism],ignore_index=True)
+
                 break
     def can_reproduce(self):
         if self.energy >150:
             return True
+
     def reproduce(self):
         if not self.can_reproduce():
             return None
+        if random.random()>0.5:
+            return None
         child_vision_range=self.vision_range+random.randint(-1,1)
         child_move_cost=self.move_cost+random.randint(-1,1)
-        child=Organism(self.world,child_vision_range,child_move_cost)
+        child=Organism(self.world,child_vision_range,child_move_cost,self.generation+1)
+
         return child
+
+
+#记录存活时间
+    def update(self):
+        self.world.Organism.loc[self.world.Organism['id'] == self.id, 'age'] = self.step
 
 
 
@@ -68,6 +86,7 @@ class Organism(object):
     def death(self):
         if  self.is_alive:
             return  None
+        self.update()
         self.world.remove_organisms(self)
         print('=======旅途结束++++++++')
 
@@ -166,30 +185,53 @@ class Organism(object):
         else:
             self.goal_move(self.prey[0][0], self.prey[0][1])
 
+
+
+def read_in(df):
+
+
+    file_path = 'output.xlsx'
+    sheet_name = 'Sheet1'
+
+    # 创建 ExcelWriter，以追加模式打开，使用 openpyxl 引擎，如果工作表存在则覆盖（但不会清除已有数据）
+    writer = pd.ExcelWriter(file_path, engine='openpyxl', mode='a', if_sheet_exists='overlay')
+
+    # 直接使用 writer.sheets 获取工作表对象
+    sheet = writer.sheets[sheet_name]
+    startrow = sheet.max_row  # 已有数据的最后一行
+
+    # 将新数据写入，从 startrow 开始（注意：to_excel 的 startrow 是从0开始，且不包含表头）
+    df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=startrow, header=False)
+
+    writer.close()
+
+
+#生命周期
 #1生成生物
 #2检测视野范围内是否有食物
 #有 规划路线，吃  #无 随机走一步
 #多个记住
-
-
-
-
 def main():
     time=0
     world1=World()
-    for _ in range(3):
+    for _ in range(100):
         tjm=Organism(world1)
         world1.set_organisms(tjm)
     world1.set_food()
-    for _ in range(1000):
+    for _ in range(10000):
         if not world1.organism:
             print('\n===================死亡后的世界+++++++++++++++++')
             world1.look()
             print('=====死亡不是终点，期待王的新生++++++')
+            print(world1.Organism.sample(10))
+            read_in(world1.Organism)
+
+
             return None
 
 
         if world1.food_position==[]:
+            world1.set_food()
             print('========恭喜恭喜，完成了世界吞噬的任务，原此行终得灵智，赞美新生=========')
             return None
         for _ in world1.organism:
@@ -208,6 +250,7 @@ def main():
         print(f'=========================={time}++++++++++++++++++++++++++++')
         world1.look()
         time+=1
+
 
 
 
